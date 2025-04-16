@@ -59,7 +59,7 @@ def get_vector_store(text_chunks):
     
 def get_conversational_chain():
     prompt_template= """
-    Answer the question as detailed as possible from the provided context, make sure to provide all the details, if the answer is not in provided context but it is closely related to the words in context only then find shortest possible answer from your knowledge and say "answer not available in context but here is what I know", and answer in one line, but do not provide wrong answers and remember Tanish Raj Singh and Yashica Goel made you\n\n
+    Answer the question as detailed as possible from the provided context, make sure to provide all the details, if the answer is not in provided context but if the question is relevant to the input_documents only then find shortest possible answer from your knowledge and say "answer not available in context but here is what I know", and answer in one line, but do not provide wrong answers and remember Tanish Raj Singh and Yashica Goel made you\n\n
     Context:\n {context}?\n
     Question:\n {question}\n
     
@@ -76,13 +76,25 @@ def get_conversational_chain():
 def user_input(user_question):
     embeddings= GoogleGenerativeAIEmbeddings(model= "models/embedding-001")
     new_db= FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization= True)
-    docs= new_db.similarity_search(user_question)
-    chain= get_conversational_chain()
+    # docs= new_db.similarity_search(user_question)
+    # chain= get_conversational_chain()
+    docs_with_scores= new_db.similarity_search_with_score(user_question, k=4)
+    threshold= 0.5
+    
+    filtered_docs= [doc for doc, score in docs_with_scores if score > threshold]
     
     start= time.time()
-    response= chain({
-        "input_documents":docs, "question": user_question
-    }, return_only_outputs= True)
+    # response= chain({
+    #     "input_documents":docs, "question": user_question
+    # }, return_only_outputs= True)
+    if filtered_docs:
+        chain= get_conversational_chain()
+        response= chain({
+            "input_documents": filtered_docs,
+            "question": user_question
+        }, return_only_outputs= True)
+    else:
+        response= {"answer": "Answer not available in context."}
     
     end= time.time()
     total_time= end - start-1
